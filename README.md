@@ -2,6 +2,10 @@
 
 A Notepad++ plugin that replicates the line number behavior from **VS Code**: the active line number is shown in a bright color, all others are dimmed. Lightweight, zero-config, works automatically with both dark and light Notepad++ themes.
 
+## Preview
+
+![Dark theme](images/npp_dark.png)
+![Light theme](images/npp_light.png)
 ---
 
 ## Preview
