@@ -5,6 +5,7 @@ A Notepad++ plugin that replicates the line number behavior from **VS Code**: th
 ## Preview
 
 ![Dark theme](images/npp_dark.png)
+
 ![Light theme](images/npp_light.png)
 ---
 
