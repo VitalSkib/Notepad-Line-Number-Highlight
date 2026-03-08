@@ -91,6 +91,17 @@ No external libraries or build systems required.
 
 ---
 
+## Changelog
+
+### v1.1
+- Full Unicode compliance — fixes paths with non-ASCII characters
+- Separate color settings for dark and light themes
+- Active line color matches VS Code Dark Modern (`#CCCCCC`)
+- Margin refreshes automatically on theme switch
+
+### v1.0
+- Initial release
+
 ## License
 
 Free to use, free to modify. Provided **as-is** with no warranty or support of any kind.
