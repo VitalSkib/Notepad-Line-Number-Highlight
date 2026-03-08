@@ -1,0 +1,30 @@
+@echo off
+
+set VC_ROOT=%ProgramFiles(x86)%\Microsoft Visual Studio\2017
+
+if exist "%VC_ROOT%\Professional\VC\Auxiliary\Build\vcvarsall.bat" goto UseVcProfessional
+if exist "%VC_ROOT%\Community\VC\Auxiliary\Build\vcvarsall.bat" goto UseVcCommunity
+
+goto ErrorNoVcVarsAll
+
+:UseVcProfessional
+call "%VC_ROOT%\Professional\VC\Auxiliary\Build\vcvarsall.bat" x86
+goto Building
+
+:UseVcCommunity
+call "%VC_ROOT%\Community\VC\Auxiliary\Build\vcvarsall.bat" x86
+goto Building
+
+:Building
+if not exist .\dll_32bit mkdir .\dll_32bit
+if exist .\dll_32bit\LineNumberHighlight.dll del /F .\dll_32bit\LineNumberHighlight.dll
+cd .\src
+cl /O1 /GS- LineNumberHighlight.cpp exports.def /LD /link kernel32.lib user32.lib comctl32.lib comdlg32.lib gdi32.lib Advapi32.lib /OUT:..\dll_32bit\LineNumberHighlight.dll
+del *.exp *.lib *.obj
+goto End
+
+:ErrorNoVcVarsAll
+echo ERROR: Could not find "vcvarsall.bat"
+goto End
+
+:End
