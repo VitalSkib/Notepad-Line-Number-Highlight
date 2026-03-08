@@ -26,6 +26,7 @@ A Notepad++ plugin that replicates the line number behavior from **VS Code**: th
 - Adapts to Notepad++ **dark and light themes** without any manual switching
 - Separate color settings are remembered for each theme independently
 - Fully customizable via a themed Settings dialog
+- Fully Unicode-compliant — works correctly with any language and file paths containing non-ASCII characters
 
 ---
 
