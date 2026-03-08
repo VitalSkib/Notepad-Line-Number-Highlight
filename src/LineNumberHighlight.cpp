@@ -30,9 +30,13 @@
 #define STYLE_ACTIVE              40
 #define STYLE_NORMAL              41
 #define OUR_MARGIN                0
+#define NPPN_READY               1001
+#define NPPN_TBMODIFICATION      1002
 #define NPPN_BUFFERACTIVATED      1010
+#define NPPN_WORDSTYLESUPDATED    1012
 #define NPPN_DARKMODECHANGED      1027
 #define SCN_UPDATEUI              2007
+#define NPPM_GETPLUGINSCONFIGDIR  (WM_USER + 1000 + 46)
 
 #define COLOR_ACTIVE_DARK    RGB(0xCC, 0xCC, 0xCC)
 #define COLOR_NORMAL_DARK    RGB(0x6E, 0x76, 0x81)
@@ -79,6 +83,7 @@ static HWND      g_hNpp        = NULL;
 static HINSTANCE g_hInst       = NULL;
 static int       g_prevLine    = -1;
 static bool      g_ready       = false;
+static bool      g_iniLoaded   = false;
 
 static COLORREF  g_colorActiveDark  = COLOR_ACTIVE_DARK;
 static COLORREF  g_colorNormalDark  = COLOR_NORMAL_DARK;
@@ -90,7 +95,7 @@ static COLORREF* g_pColorNormal     = &g_colorNormalDark;
 #define g_colorNormal (*g_pColorNormal)
 
 static COLORREF  g_customColors[16] = {};
-static WCHAR     g_iniPath[MAX_PATH] = {};
+static WCHAR     g_iniPath[260] = {};
 static FuncItem  g_funcItems[2];
 
 // ── Theme colors ──────────────────────────────────────────────────────────────
@@ -105,16 +110,26 @@ static HBRUSH   g_brBg      = NULL;
 static HBRUSH   g_brBtn     = NULL;
 
 // ── INI ───────────────────────────────────────────────────────────────────────
-static void BuildIniPath(WCHAR* configDir) {
-    WCHAR appdata[MAX_PATH] = {};
-    if(GetEnvironmentVariableW(L"APPDATA", appdata, MAX_PATH)) {
-        lstrcpyW(g_iniPath, appdata);
-        lstrcatW(g_iniPath, L"\\Notepad++\\plugins\\Config\\LineNumberHighlight.ini");
-        return;
+static void BuildIniPath() {
+    // NPPM_GETPLUGINSCONFIGDIR requires the real Npp HWND from FindWindowW,
+    // not the one passed via setInfo (which is a different handle).
+    // This supports both installed and portable Notepad++.
+    HWND hNpp = FindWindowW(L"Notepad++", NULL);
+    if(hNpp) {
+        int cfgLen = (int)SendMessageW(hNpp, NPPM_GETPLUGINSCONFIGDIR, 0, (LPARAM)NULL);
+        if(cfgLen > 0 && cfgLen < 259) {
+            WCHAR cfgDir[260] = {};
+            SendMessageW(hNpp, NPPM_GETPLUGINSCONFIGDIR, cfgLen + 1, (LPARAM)cfgDir);
+            if(cfgDir[0]) {
+                lstrcpyW(g_iniPath, cfgDir);
+                lstrcatW(g_iniPath, L"\\LineNumberHighlight.ini");
+                return;
+            }
+        }
     }
     // Fallback: next to DLL
-    WCHAR dllPath[MAX_PATH] = {};
-    GetModuleFileNameW(g_hInst, dllPath, MAX_PATH);
+    WCHAR dllPath[260] = {};
+    GetModuleFileNameW(g_hInst, dllPath, 260);
     int len = lstrlenW(dllPath), dot = len;
     for(int i = len-1; i >= 0; i--) if(dllPath[i] == L'.') { dot = i; break; }
     for(int i = 0; i < dot; i++) g_iniPath[i] = dllPath[i];
@@ -592,7 +607,7 @@ static void ShowAbout() {
         x, y, ww, wh, owner, NULL, g_hInst, NULL);
     if(!hDlg) return;
 
-    HWND hTitle = CreateWindowExW(0, L"STATIC", L"Line Number Highlight v1.0",
+    HWND hTitle = CreateWindowExW(0, L"STATIC", L"Line Number Highlight v1.2",
         WS_CHILD|WS_VISIBLE|SS_LEFT, 20,16,320,20, hDlg,(HMENU)0,g_hInst,NULL);
     HWND hCopy  = CreateWindowExW(0, L"STATIC", L"Copyright VitalS 2026",
         WS_CHILD|WS_VISIBLE|SS_LEFT, 20,150,200,18, hDlg,(HMENU)0,g_hInst,NULL);
@@ -637,10 +652,8 @@ static void ShowAbout() {
 // ── Plugin exports ────────────────────────────────────────────────────────────
 extern "C" {
 __declspec(dllexport)
-void setInfo(HWND npp, HWND, HWND, WCHAR*, WCHAR* pluginConfigDir) {
+void setInfo(HWND npp, HWND, HWND, WCHAR*, WCHAR*) {
     g_hNpp = npp;
-    BuildIniPath(pluginConfigDir);
-    LoadSettings();
     lstrcpyW(g_funcItems[0]._itemName, L"Settings");
     g_funcItems[0]._pFunc       = ShowSettings;
     g_funcItems[0]._cmdID       = 0;
@@ -672,9 +685,14 @@ void beNotified(SCNotification* n) {
         RenderLine(cur, digits, true);
         g_prevLine = cur; return;
     }
+    if(code == NPPN_READY && !g_iniLoaded) {
+        BuildIniPath();
+        LoadSettings();
+        g_iniLoaded = true;
+    }
     if(code == NPPN_BUFFERACTIVATED) g_ready = false;
-    if(code == 1002) UpdateThemeColors(); // NPPN_TBMODIFICATION — after Npp init
-    if(code == NPPN_DARKMODECHANGED || code == 1012) {
+    if(code == NPPN_TBMODIFICATION) UpdateThemeColors();
+    if(code == NPPN_DARKMODECHANGED || code == NPPN_WORDSTYLESUPDATED) {
         bool wasDark = g_darkMode;
         UpdateThemeColors();
         if(g_darkMode != wasDark || code == NPPN_DARKMODECHANGED) RefreshMargin();
