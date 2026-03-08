@@ -2,19 +2,16 @@
 
 A Notepad++ plugin that replicates the line number behavior from **VS Code**: the active line number is shown in a bright color, all others are dimmed. Lightweight, zero-config, works automatically with both dark and light Notepad++ themes.
 
-## Preview
-
-![Dark theme](images/npp_dark.png)
-
-![Light theme](images/npp_light.png)
-
-![Light theme](images/npp_dark_30.png)
 ---
 
 ## Preview
 
-| Dark theme                                   | Light theme                                  |
-| -------------------------------------------- | -------------------------------------------- |
+![Dark theme](images/npp_dark.png)
+![Light theme](images/npp_light.png)
+![Light theme](images/npp_dark_30.png)
+
+| Dark theme | Light theme |
+|---|---|
 | Active line: `#CCCCCC` · Inactive: `#6E7681` | Active line: `#1A1A1A` · Inactive: `#999999` |
 
 ---
@@ -26,21 +23,33 @@ A Notepad++ plugin that replicates the line number behavior from **VS Code**: th
 - Adapts to Notepad++ **dark and light themes** without any manual switching
 - Separate color settings are remembered for each theme independently
 - Fully customizable via a themed Settings dialog
-- Fully Unicode-compliant — works correctly with any language and file paths containing non-ASCII characters
+- Works with both **installed and portable** Notepad++
 
 ---
 
 ## Installation
 
+### Standard install
+
 1. Download `LineNumberHighlight.dll` from the [Releases](../../releases) page
 2. Create the folder:
-   
    ```
    C:\Program Files\Notepad++\plugins\LineNumberHighlight\
    ```
 3. Copy `LineNumberHighlight.dll` into that folder
 4. Restart Notepad++
-5. The plugin will appear under **Plugins → Line Number Highlight**
+
+### Portable install
+
+1. Download `LineNumberHighlight.dll` from the [Releases](../../releases) page
+2. Create the folder:
+   ```
+   <Notepad++ folder>\plugins\LineNumberHighlight\
+   ```
+3. Copy `LineNumberHighlight.dll` into that folder
+4. Restart Notepad++
+
+The plugin will appear under **Plugins → Line Number Highlight**.
 
 ---
 
@@ -48,18 +57,17 @@ A Notepad++ plugin that replicates the line number behavior from **VS Code**: th
 
 Open via **Plugins → Line Number Highlight → Settings**
 
-| Option                | Description                                      |
-| --------------------- | ------------------------------------------------ |
-| Active line number    | Color used for the current line number           |
-| Inactive line numbers | Color used for all other line numbers            |
-| Pick color            | Opens the system color picker                    |
-| Reset                 | Restores the default color for the current theme |
+| Option | Description |
+|---|---|
+| Active line number | Color used for the current line number |
+| Inactive line numbers | Color used for all other line numbers |
+| Pick color | Opens the system color picker |
+| Reset | Restores the default color for the current theme |
 
-Settings are saved per-theme to:
+Settings are saved per-theme. The config file location is determined automatically:
 
-```
-%APPDATA%\Notepad++\plugins\Config\LineNumberHighlight.ini
-```
+- **Standard install:** `%APPDATA%\Notepad++\plugins\Config\LineNumberHighlight.ini`
+- **Portable install:** `<Notepad++ folder>\plugins\Config\LineNumberHighlight.ini`
 
 ---
 
@@ -80,11 +88,12 @@ The plugin uses Scintilla's `SCN_UPDATEUI` notification with direct function cal
 ## Building from source
 
 Written in **C++**, requires MinGW-Builds x86_64, msvcrt variant:
-[https://github.com/niXman/mingw-builds-binaries/releases](https://github.com/niXman/mingw-builds-binaries/releases)
+https://github.com/niXman/mingw-builds-binaries/releases
 
-Download the `x86_64-*-release-win32-seh-msvcrt-*` build (not ucrt, not i686).
+Download the `x86_64-*-release-win32-seh-msvcrt-*` build.
 Tested with: `x86_64-15.2.0-release-win32-seh-msvcrt-rt_v12-rev0`
 Extract to `C:\mingw32rt\` and add `C:\mingw32rt\bin\` to PATH.
+
 ```bat
 x86_64-w64-mingw32-g++ -std=c++14 -O2 -DUNICODE -D_UNICODE ^
   -shared -static-libgcc -static-libstdc++ -Wl,--kill-at ^
@@ -95,17 +104,6 @@ x86_64-w64-mingw32-g++ -std=c++14 -O2 -DUNICODE -D_UNICODE ^
 No external libraries or build systems required.
 
 ---
-
-## Changelog
-
-### v1.1
-- Full Unicode compliance — fixes paths with non-ASCII characters
-- Separate color settings for dark and light themes
-- Active line color matches VS Code Dark Modern (`#CCCCCC`)
-- Margin refreshes automatically on theme switch
-
-### v1.0
-- Initial release
 
 ## License
 
