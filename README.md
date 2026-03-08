@@ -79,8 +79,12 @@ The plugin uses Scintilla's `SCN_UPDATEUI` notification with direct function cal
 
 ## Building from source
 
-Written in **C++**, compiled with MinGW (winlibs x86\_64-15.2.0, msvcrt).
+Written in **C++**, requires MinGW-Builds x86_64, msvcrt variant:
+[https://github.com/niXman/mingw-builds-binaries/releases](https://github.com/niXman/mingw-builds-binaries/releases)
 
+Download the `x86_64-*-release-win32-seh-msvcrt-*` build (not ucrt, not i686).
+Tested with: `x86_64-15.2.0-release-win32-seh-msvcrt-rt_v12-rev0`
+Extract to `C:\mingw32rt\` and add `C:\mingw32rt\bin\` to PATH.
 ```bat
 x86_64-w64-mingw32-g++ -std=c++14 -O2 -DUNICODE -D_UNICODE ^
   -shared -static-libgcc -static-libstdc++ -Wl,--kill-at ^
