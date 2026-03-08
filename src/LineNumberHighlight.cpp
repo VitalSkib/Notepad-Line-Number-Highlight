@@ -30,7 +30,9 @@
 #define STYLE_ACTIVE              40
 #define STYLE_NORMAL              41
 #define OUR_MARGIN                0
+#define NPPN_TBMODIFICATION       1002
 #define NPPN_BUFFERACTIVATED      1010
+#define NPPN_WORDSTYLESUPDATED    1012
 #define NPPN_DARKMODECHANGED      1027
 #define SCN_UPDATEUI              2007
 
@@ -105,7 +107,7 @@ static HBRUSH   g_brBg      = NULL;
 static HBRUSH   g_brBtn     = NULL;
 
 // ── INI ───────────────────────────────────────────────────────────────────────
-static void BuildIniPath(WCHAR* configDir) {
+static void BuildIniPath() {
     WCHAR appdata[MAX_PATH] = {};
     if(GetEnvironmentVariableW(L"APPDATA", appdata, MAX_PATH)) {
         lstrcpyW(g_iniPath, appdata);
@@ -637,9 +639,9 @@ static void ShowAbout() {
 // ── Plugin exports ────────────────────────────────────────────────────────────
 extern "C" {
 __declspec(dllexport)
-void setInfo(HWND npp, HWND, HWND, WCHAR*, WCHAR* pluginConfigDir) {
+void setInfo(HWND npp, HWND, HWND) {
     g_hNpp = npp;
-    BuildIniPath(pluginConfigDir);
+    BuildIniPath();
     LoadSettings();
     lstrcpyW(g_funcItems[0]._itemName, L"Settings");
     g_funcItems[0]._pFunc       = ShowSettings;
@@ -673,8 +675,8 @@ void beNotified(SCNotification* n) {
         g_prevLine = cur; return;
     }
     if(code == NPPN_BUFFERACTIVATED) g_ready = false;
-    if(code == 1002) UpdateThemeColors(); // NPPN_TBMODIFICATION — after Npp init
-    if(code == NPPN_DARKMODECHANGED || code == 1012) {
+    if(code == NPPN_TBMODIFICATION) UpdateThemeColors(); // NPPN_TBMODIFICATION — after Npp init
+    if(code == NPPN_DARKMODECHANGED || code == NPPN_WORDSTYLESUPDATED) {
         bool wasDark = g_darkMode;
         UpdateThemeColors();
         if(g_darkMode != wasDark || code == NPPN_DARKMODECHANGED) RefreshMargin();
