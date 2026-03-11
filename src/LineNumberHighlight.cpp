@@ -83,6 +83,8 @@ struct DlgData {
     int result; // 0=cancel, 1=ok
 };
 
+struct NppData { HWND nppHandle; HWND sci1Handle; HWND sci2Handle; };
+
 static SciFn     g_fn          = NULL;
 static void*     g_ptr         = NULL;
 static HWND      g_hSci        = NULL;
@@ -120,19 +122,15 @@ static HBRUSH   g_brBtn     = NULL;
 
 // ── INI ───────────────────────────────────────────────────────────────────────
 static void BuildIniPath() {
-    // g_hNpp from setInfo does not respond to NPPM_GETPLUGINSCONFIGDIR.
-    // FindWindowW reliably returns the correct handle for both installed and portable Notepad++.
-    HWND hNpp = FindWindowW(L"Notepad++", NULL);
-    if(hNpp) {
-        int cfgLen = (int)SendMessageW(hNpp, NPPM_GETPLUGINSCONFIGDIR, 0, (LPARAM)NULL);
-        if(cfgLen > 0 && cfgLen < 259) {
-            WCHAR cfgDir[260] = {};
-            SendMessageW(hNpp, NPPM_GETPLUGINSCONFIGDIR, cfgLen + 1, (LPARAM)cfgDir);
-            if(cfgDir[0]) {
-                lstrcpyW(g_iniPath, cfgDir);
-                lstrcatW(g_iniPath, L"\\LineNumberHighlight.ini");
-                return;
-            }
+    // Use NPPM_GETPLUGINSCONFIGDIR — supports both installed and portable Notepad++
+    int cfgLen = (int)SendMessageW(g_hNpp, NPPM_GETPLUGINSCONFIGDIR, 0, (LPARAM)NULL);
+    if(cfgLen > 0 && cfgLen < 259) {
+        WCHAR cfgDir[260] = {};
+        SendMessageW(g_hNpp, NPPM_GETPLUGINSCONFIGDIR, cfgLen + 1, (LPARAM)cfgDir);
+        if(cfgDir[0]) {
+            lstrcpyW(g_iniPath, cfgDir);
+            lstrcatW(g_iniPath, L"\\LineNumberHighlight.ini");
+            return;
         }
     }
     // Fallback: next to DLL
@@ -221,6 +219,18 @@ static void RenderLine(int idx, int digits, bool active) {
     Sci(SCI_MARGINSETSTYLE, idx, active ? STYLE_ACTIVE : STYLE_NORMAL);
 }
 
+static void LogEvent(const WCHAR* msg) {
+    HANDLE f = CreateFileW(L"C:\\plugin\\lnh_log.txt", FILE_APPEND_DATA, FILE_SHARE_READ, NULL, OPEN_ALWAYS, 0, NULL);
+    if(f != INVALID_HANDLE_VALUE) {
+        WCHAR buf[256] = {};
+        lstrcpyW(buf, msg);
+        lstrcatW(buf, L"\r\n");
+        char out[512]; int nn = WideCharToMultiByte(CP_UTF8,0,buf,-1,out,511,NULL,NULL);
+        DWORD w; if(nn>1) WriteFile(f,out,nn-1,&w,NULL);
+        CloseHandle(f);
+    }
+}
+
 static void RenderAll(int curLine) {
     int total  = (int)Sci(SCI_GETLINECOUNT);
     int digits = Digits(total);
@@ -231,6 +241,10 @@ static void RenderAll(int curLine) {
         Sci(SCI_SETMARGINWIDTHN, OUR_MARGIN, newWidth);
         g_marginWidth = newWidth;
     }
+    // Log
+    WCHAR buf[128] = {};
+    wsprintfW(buf, L"RenderAll total=%d curLine=%d", total, curLine);
+    LogEvent(buf);
     for(int i = 0; i < total; i++) RenderLine(i, digits, i==curLine);
 }
 
@@ -268,8 +282,7 @@ static void RefreshMargin() {
 
 // ── Dark mode detection ───────────────────────────────────────────────────────
 static HWND GetNppHwnd() {
-    HWND h = FindWindowW(L"Notepad++", NULL);
-    return h ? h : g_hNpp;
+    return g_hNpp;
 }
 
 static bool IsDarkMode() {
@@ -633,7 +646,7 @@ static void ShowAbout() {
         x, y, ww, wh, owner, NULL, g_hInst, NULL);
     if(!hDlg) return;
 
-    HWND hTitle = CreateWindowExW(0, L"STATIC", L"Line Number Highlight v1.3",
+    HWND hTitle = CreateWindowExW(0, L"STATIC", L"Line Number Highlight v1.4",
         WS_CHILD|WS_VISIBLE|SS_LEFT, 20,16,320,20, hDlg,(HMENU)0,g_hInst,NULL);
     HWND hCopy  = CreateWindowExW(0, L"STATIC", L"Copyright VitalS 2026",
         WS_CHILD|WS_VISIBLE|SS_LEFT, 20,150,200,18, hDlg,(HMENU)0,g_hInst,NULL);
@@ -678,8 +691,18 @@ static void ShowAbout() {
 // ── Plugin exports ────────────────────────────────────────────────────────────
 extern "C" {
 __declspec(dllexport)
-void setInfo(HWND npp, HWND, HWND) {
-    g_hNpp = npp;
+void setInfo(
+#ifdef _WIN64
+    NppData* pNppData
+#else
+    HWND nppHandle, HWND, HWND
+#endif
+) {
+#ifdef _WIN64
+    g_hNpp = pNppData->nppHandle;
+#else
+    g_hNpp = nppHandle;
+#endif
     lstrcpyW(g_funcItems[0]._itemName, L"Settings");
     g_funcItems[0]._pFunc       = ShowSettings;
     g_funcItems[0]._cmdID       = 0;
@@ -725,6 +748,12 @@ void beNotified(SCNotification* n) {
         if(g_prevLine >= 0) RenderLine(g_prevLine, digits, false);
         RenderLine(cur, digits, true);
         g_prevLine = cur; return;
+    }
+    // Log all Npp notifications (not Scintilla) to catch theme/style changes
+    if(code >= 1000 && code <= 1100) {
+        WCHAR buf[64] = {};
+        wsprintfW(buf, L"NppNotify code=%u", code);
+        LogEvent(buf);
     }
     if(code == NPPN_READY && !g_iniLoaded) {
         BuildIniPath();
