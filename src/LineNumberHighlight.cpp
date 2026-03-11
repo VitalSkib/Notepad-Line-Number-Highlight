@@ -219,18 +219,6 @@ static void RenderLine(int idx, int digits, bool active) {
     Sci(SCI_MARGINSETSTYLE, idx, active ? STYLE_ACTIVE : STYLE_NORMAL);
 }
 
-static void LogEvent(const WCHAR* msg) {
-    HANDLE f = CreateFileW(L"C:\\plugin\\lnh_log.txt", FILE_APPEND_DATA, FILE_SHARE_READ, NULL, OPEN_ALWAYS, 0, NULL);
-    if(f != INVALID_HANDLE_VALUE) {
-        WCHAR buf[256] = {};
-        lstrcpyW(buf, msg);
-        lstrcatW(buf, L"\r\n");
-        char out[512]; int nn = WideCharToMultiByte(CP_UTF8,0,buf,-1,out,511,NULL,NULL);
-        DWORD w; if(nn>1) WriteFile(f,out,nn-1,&w,NULL);
-        CloseHandle(f);
-    }
-}
-
 static void RenderAll(int curLine) {
     int total  = (int)Sci(SCI_GETLINECOUNT);
     int digits = Digits(total);
@@ -241,10 +229,6 @@ static void RenderAll(int curLine) {
         Sci(SCI_SETMARGINWIDTHN, OUR_MARGIN, newWidth);
         g_marginWidth = newWidth;
     }
-    // Log
-    WCHAR buf[128] = {};
-    wsprintfW(buf, L"RenderAll total=%d curLine=%d", total, curLine);
-    LogEvent(buf);
     for(int i = 0; i < total; i++) RenderLine(i, digits, i==curLine);
 }
 
@@ -748,12 +732,6 @@ void beNotified(SCNotification* n) {
         if(g_prevLine >= 0) RenderLine(g_prevLine, digits, false);
         RenderLine(cur, digits, true);
         g_prevLine = cur; return;
-    }
-    // Log all Npp notifications (not Scintilla) to catch theme/style changes
-    if(code >= 1000 && code <= 1100) {
-        WCHAR buf[64] = {};
-        wsprintfW(buf, L"NppNotify code=%u", code);
-        LogEvent(buf);
     }
     if(code == NPPN_READY && !g_iniLoaded) {
         BuildIniPath();
