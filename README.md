@@ -109,6 +109,7 @@ No external libraries or build systems required.
 
 ## Changelog
 
+**v1.4** — Correct 64-bit handle via `NppData*`, removed `FindWindowW`  
 **v1.3** — Bug fixes and rendering improvements  
 **v1.2** — Portable Notepad++ support, named constants, code cleanup  
 **v1.1** — Unicode migration  
