@@ -7,6 +7,7 @@
 #define SCI_SETMARGINTYPEN        2240
 #define SCI_SETMARGINWIDTHN       2242
 #define SCI_MARGINSETTEXT         2530
+#define SCI_MARGINGETTEXT         2531
 #define SCI_MARGINSETSTYLE        2532
 #define SCI_STYLESETFORE          2051
 #define SCI_STYLESETBACK          2052
@@ -36,7 +37,13 @@
 #define NPPN_WORDSTYLESUPDATED    1012
 #define NPPN_DARKMODECHANGED      1027
 #define SCN_UPDATEUI              2007
-#define NPPM_GETPLUGINSCONFIGDIR  (WM_USER + 1000 + 46)
+#define SCN_MODIFIED              2008
+#define SC_UPDATE_CONTENT         1
+#define SC_MOD_INSERTTEXT         0x01
+#define SC_MOD_DELETETEXT         0x02
+#define NPPM_GETPLUGINSCONFIGDIR           (WM_USER + 1000 + 46)
+#define NPPM_GETEDITORDEFAULTBACKGROUNDCOLOR (WM_USER + 1091)
+#define NPPM_ISDARKMODEENABLED               (WM_USER + 1107)
 
 #define COLOR_ACTIVE_DARK    RGB(0xCC, 0xCC, 0xCC)
 #define COLOR_NORMAL_DARK    RGB(0x6E, 0x76, 0x81)
@@ -82,6 +89,8 @@ static HWND      g_hSci        = NULL;
 static HWND      g_hNpp        = NULL;
 static HINSTANCE g_hInst       = NULL;
 static int       g_prevLine    = -1;
+static int       g_prevTotal   = 0;
+static int       g_marginWidth = 0;
 static bool      g_ready       = false;
 static bool      g_iniLoaded   = false;
 
@@ -111,9 +120,8 @@ static HBRUSH   g_brBtn     = NULL;
 
 // ── INI ───────────────────────────────────────────────────────────────────────
 static void BuildIniPath() {
-    // NPPM_GETPLUGINSCONFIGDIR requires the real Npp HWND from FindWindowW,
-    // not the one passed via setInfo (which is a different handle).
-    // This supports both installed and portable Notepad++.
+    // g_hNpp from setInfo does not respond to NPPM_GETPLUGINSCONFIGDIR.
+    // FindWindowW reliably returns the correct handle for both installed and portable Notepad++.
     HWND hNpp = FindWindowW(L"Notepad++", NULL);
     if(hNpp) {
         int cfgLen = (int)SendMessageW(hNpp, NPPM_GETPLUGINSCONFIGDIR, 0, (LPARAM)NULL);
@@ -218,7 +226,11 @@ static void RenderAll(int curLine) {
     int digits = Digits(total);
     LRESULT cw = Sci(SCI_TEXTWIDTH, STYLE_NORMAL, (LPARAM)"0");
     if(cw <= 0) cw = 8;
-    Sci(SCI_SETMARGINWIDTHN, OUR_MARGIN, (int)cw * (digits+1));
+    int newWidth = (int)cw * (digits+1);
+    if(newWidth != g_marginWidth) {
+        Sci(SCI_SETMARGINWIDTHN, OUR_MARGIN, newWidth);
+        g_marginWidth = newWidth;
+    }
     for(int i = 0; i < total; i++) RenderLine(i, digits, i==curLine);
 }
 
@@ -227,9 +239,23 @@ static void DoInit(HWND sci) {
     g_fn    = (SciFn)SendMessageW(sci, SCI_GETDIRECTFUNCTION, 0, 0);
     g_ptr   = (void*)SendMessageW(sci, SCI_GETDIRECTPOINTER,  0, 0);
     ApplyStyles();
-    int cur = (int)Sci(SCI_LINEFROMPOSITION, Sci(SCI_GETCURRENTPOS));
-    RenderAll(cur);
-    g_prevLine = cur; g_ready = true;
+    int cur   = (int)Sci(SCI_LINEFROMPOSITION, Sci(SCI_GETCURRENTPOS));
+    int total = (int)Sci(SCI_GETLINECOUNT);
+    // Check last line — if it has margin text, all lines are intact
+    char existing[32] = {};
+    Sci(SCI_MARGINGETTEXT, total - 1, (LPARAM)existing);
+    if(existing[0]) {
+        // Margin is intact — only update active line
+        int digits = Digits(total);
+        if(g_prevLine >= 0 && g_prevLine != cur)
+            RenderLine(g_prevLine, digits, false);
+        RenderLine(cur, digits, true);
+    } else {
+        RenderAll(cur);
+    }
+    g_prevLine  = cur;
+    g_prevTotal = total;
+    g_ready = true;
 }
 
 static void RefreshMargin() {
@@ -248,8 +274,8 @@ static HWND GetNppHwnd() {
 
 static bool IsDarkMode() {
     HWND hNpp = GetNppHwnd();
-    if(SendMessageW(hNpp, (WM_USER+1107), 0, 0)) return true; // NPPM_ISDARKMODEENABLED
-    LRESULT bg = SendMessageW(hNpp, (WM_USER+1091), 0, 0);    // NPPM_GETEDITORDEFAULTBACKGROUNDCOLOR
+    if(SendMessageW(hNpp, NPPM_ISDARKMODEENABLED, 0, 0)) return true;
+    LRESULT bg = SendMessageW(hNpp, NPPM_GETEDITORDEFAULTBACKGROUNDCOLOR, 0, 0);
     int r=(int)(bg&0xFF), g=(int)((bg>>8)&0xFF), b=(int)((bg>>16)&0xFF);
     return ((r+g+b)/3) < 128;
 }
@@ -607,7 +633,7 @@ static void ShowAbout() {
         x, y, ww, wh, owner, NULL, g_hInst, NULL);
     if(!hDlg) return;
 
-    HWND hTitle = CreateWindowExW(0, L"STATIC", L"Line Number Highlight v1.2",
+    HWND hTitle = CreateWindowExW(0, L"STATIC", L"Line Number Highlight v1.3",
         WS_CHILD|WS_VISIBLE|SS_LEFT, 20,16,320,20, hDlg,(HMENU)0,g_hInst,NULL);
     HWND hCopy  = CreateWindowExW(0, L"STATIC", L"Copyright VitalS 2026",
         WS_CHILD|WS_VISIBLE|SS_LEFT, 20,150,200,18, hDlg,(HMENU)0,g_hInst,NULL);
@@ -652,7 +678,7 @@ static void ShowAbout() {
 // ── Plugin exports ────────────────────────────────────────────────────────────
 extern "C" {
 __declspec(dllexport)
-void setInfo(HWND npp, HWND, HWND, WCHAR*, WCHAR*) {
+void setInfo(HWND npp, HWND, HWND) {
     g_hNpp = npp;
     lstrcpyW(g_funcItems[0]._itemName, L"Settings");
     g_funcItems[0]._pFunc       = ShowSettings;
@@ -674,13 +700,28 @@ __declspec(dllexport) BOOL         isUnicode()                  { return TRUE; }
 __declspec(dllexport)
 void beNotified(SCNotification* n) {
     UINT code = n->nmhdr.code;
+    // SCN_MODIFIED: text inserted/deleted — force full re-render on next SCN_UPDATEUI
+    if(code == (UINT)SCN_MODIFIED) {
+        if(!IsSci(n->nmhdr.hwndFrom)) return;
+        if(n->modificationType & (SC_MOD_INSERTTEXT | SC_MOD_DELETETEXT))
+            g_ready = false;
+        return;
+    }
     if(code == (UINT)SCN_UPDATEUI) {
         HWND src = n->nmhdr.hwndFrom;
         if(!IsSci(src)) return;
         if(!g_ready || g_hSci != src) { DoInit(src); return; }
-        int cur    = (int)Sci(SCI_LINEFROMPOSITION, Sci(SCI_GETCURRENTPOS));
+        int cur   = (int)Sci(SCI_LINEFROMPOSITION, Sci(SCI_GETCURRENTPOS));
+        int total = (int)Sci(SCI_GETLINECOUNT);
+        // Line count changed (paste, delete, undo) — full re-render
+        if(total != g_prevTotal) {
+            RenderAll(cur);
+            g_prevLine  = cur;
+            g_prevTotal = total;
+            return;
+        }
         if(cur == g_prevLine) return;
-        int digits = Digits((int)Sci(SCI_GETLINECOUNT));
+        int digits = Digits(total);
         if(g_prevLine >= 0) RenderLine(g_prevLine, digits, false);
         RenderLine(cur, digits, true);
         g_prevLine = cur; return;
@@ -690,7 +731,7 @@ void beNotified(SCNotification* n) {
         LoadSettings();
         g_iniLoaded = true;
     }
-    if(code == NPPN_BUFFERACTIVATED) g_ready = false;
+    if(code == NPPN_BUFFERACTIVATED) { g_ready = false; g_prevLine = -1; g_prevTotal = 0; }
     if(code == NPPN_TBMODIFICATION) UpdateThemeColors();
     if(code == NPPN_DARKMODECHANGED || code == NPPN_WORDSTYLESUPDATED) {
         bool wasDark = g_darkMode;
