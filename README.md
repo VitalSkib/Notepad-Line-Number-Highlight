@@ -7,9 +7,7 @@ A Notepad++ plugin that replicates the line number behavior from **VS Code**: th
 ## Preview
 
 ![Dark theme](images/npp_dark.png)
-
 ![Light theme](images/npp_light.png)
-
 ![Light theme](images/npp_dark_30.png)
 
 | Dark theme | Light theme |
@@ -104,6 +102,15 @@ x86_64-w64-mingw32-g++ -std=c++14 -O2 -DUNICODE -D_UNICODE ^
 ```
 
 No external libraries or build systems required.
+
+---
+
+## Changelog
+
+**v1.3** — Bug fixes and rendering improvements  
+**v1.2** — Portable Notepad++ support, named constants, code cleanup  
+**v1.1** — Unicode migration  
+**v1.0** — Initial release
 
 ---
 
